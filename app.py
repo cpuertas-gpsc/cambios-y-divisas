@@ -2,72 +2,9 @@ import streamlit as st
 import pandas as pd
 import requests
 import joblib
-from datetime import datetime
-import io
+import numpy as np
+import os
 
-
-# 🎨 Configuración visual corporativa
-st.set_page_config(page_title="Predicción USD/EUR", layout="wide")
-
-# ✅ Fondo con imagen corporativa difuminada y repetida
-st.markdown("""
-    <style>
-    .stApp {
-        background-image: url("https://raw.githubusercontent.com/cpuertas-gpsc/-Predicci-n-del-valor-del-d-lar-y-estrategia-de-divisas/main/consturcciones-felipe-castellano-edificio-moderno-1500x630.jpg");
-        background-size: cover;
-        background-repeat: repeat-y;
-        background-attachment: fixed;
-    }
-    .overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(255, 255, 255, 0.2);
-        z-index: -1;
-    }
-    </style>
-    <div class="overlay"></div>
-    """, unsafe_allow_html=True)
-
-
-# ✅ Estilos personalizados
-st.markdown("""
-    <style>
-    body {
-        background-color: #f5f7fa;
-        font-family: 'Segoe UI', sans-serif;
-    }
-    h1, h2, h3 {
-        color: #0b6cb7;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-    div[data-testid="stSidebar"] {
-        background-color: #e6f2ff;
-    }
-    .logo {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 100;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# ✅ Logo institucional fijo
-st.markdown("""
-    <style>
-    .logo {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 100;
-    }
-    </style>
-    <img class="logo" src="https://raw.githubusercontent.com/cpuertas-gpsc/-Predicci-n-del-valor-del-d-lar-y-estrategia-de-divisas/main/logo%20grupo.JPG" width="240">
-    """, unsafe_allow_html=True)
 
 
 # ✅ Título institucional
@@ -135,7 +72,19 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
+import os
 # 📦 Cargar modelo Prophet entrenado y forecast actualizado
+
+# Definir forecast como None por defecto
+forecast = None
+# Intentar cargar forecast.csv si existe
+if os.path.exists("forecast.csv"):
+    try:
+        forecast = pd.read_csv("forecast.csv", parse_dates=["ds"])
+    except Exception as e:
+        st.error(f"Error al cargar 'forecast.csv': {e}")
+else:
+    st.warning("No se encontró el archivo 'forecast.csv'. Expórtalo desde el notebook.")
 import numpy as np
 # Cargar modelo multivariable y datos de test
 modelo = joblib.load("modelo_eurusd_multivariable.pkl")
@@ -261,13 +210,13 @@ if not valor_real_fila.empty:
 
     # 💬 Recomendación financiera profesional
     if dif_optimista > 1.5:
-        st.success(f"""💼 <strong>Recomendación:</strong> Se proyecta una apreciación del dólar frente al euro. 
+        st.success(f""" <strong>Recomendación:</strong> Se proyecta una apreciación del dólar frente al euro. 
         <br>Desde una perspectiva financiera, <strong>conviene esperar</strong> para vender, ya que el escenario optimista sugiere una mejora en el tipo de cambio.""", unsafe_allow_html=True)
     elif dif_pesimista < -1.5:
-        st.error(f"""💼 <strong>Recomendación:</strong> El escenario pesimista indica una posible depreciación del dólar. 
+        st.error(f""" <strong>Recomendación:</strong> El escenario pesimista indica una posible depreciación del dólar. 
         <br>Desde un enfoque conservador, <strong>conviene vender ahora</strong> para evitar pérdidas futuras.""", unsafe_allow_html=True)
     else:
-        st.info(f"""💼 <strong>Recomendación:</strong> Las proyecciones muestran variaciones moderadas. 
+        st.info(f""" <strong>Recomendación:</strong> Las proyecciones muestran variaciones moderadas. 
         <br>Desde una perspectiva de estabilidad, <strong>puede mantenerse la posición</strong> o realizar la venta según necesidades de liquidez.""", unsafe_allow_html=True)
 
 else:
@@ -277,21 +226,6 @@ else:
         "Valor USD/EUR": [neutro, positivo, negativo]
     })
     st.dataframe(comparativa.style.format({"Valor USD/EUR": "{:.4f}"}))
-
-
-# 📤 Convertir tabla a CSV
-csv_buffer = io.StringIO()
-comparativa.to_csv(csv_buffer, index=False)
-csv_data = csv_buffer.getvalue()
-
-# 📥 Botón de descarga
-st.download_button(
-    label="📥 Descargar tabla como CSV",
-    data=csv_data,
-    file_name="comparativa_usdeur.csv",
-    mime="text/csv"
-)
-
 
 # 📊 Resumen de la predicción
 st.markdown("### Resumen de la predicción")
@@ -315,12 +249,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 📘 Valores predichos manuales (para simulación)
-neutro = 1.1569
-positivo = 1.2147
-negativo = 1.0990
-valor_actual = 1.1555
-fecha_mas_cercana = datetime(2028, 6, 30)
 
 # 📐 Cálculos de dispersión y riesgo
 rango = round(positivo - negativo, 4)
@@ -366,9 +294,6 @@ st.markdown(f"""
 • Desviación media: <strong>{round((positivo - negativo)/2, 4)}</strong> puntos desde el base<br><br>
 
 <strong>Métricas de fiabilidad (último mes):</strong><br>
-• MAE: <strong>{comparacion['y'].sub(comparacion['yhat']).abs().mean():.5f}</strong><br>
-• RMSE: <strong>{((comparacion['y'] - comparacion['yhat'])**2).mean()**0.5:.5f}</strong><br>
-{f"• Porcentaje de aciertos en agosto (<0.01): <strong>{comparacion_agosto['acierto'].mean()*100:.2f}%</strong><br>• Desviación estándar del error en agosto: <strong>{comparacion_agosto['error'].std():.5f}</strong>" if comparacion_agosto is not None and not comparacion_agosto.empty else ''}
 <br>
 <strong>Interpretación técnica:</strong><br>
 Este rango representa la amplitud entre los extremos proyectados por el modelo. Refleja la sensibilidad del tipo de cambio ante factores macroeconómicos y permite identificar ventanas de incertidumbre relevantes para la toma de decisiones.<br><br>
@@ -378,6 +303,46 @@ La amplitud observada sugiere un entorno de volatilidad relevante. Este comporta
 
 </div>
 """, unsafe_allow_html=True)
+
+st.title('Predicción EUR/USD - App Multimodelo')
+
+# Cargar modelo Random Forest
+modelo = joblib.load('modelo_eurusd_multivariable.pkl') if os.path.exists('modelo_eurusd_multivariable.pkl') else None
+# Cargar test multivariable
+df_test = pd.read_csv('test_multivariable.csv') if os.path.exists('test_multivariable.csv') else None
+# Cargar forecast Prophet
+forecast = pd.read_csv('forecast.csv') if os.path.exists('forecast.csv') else None
+
+
+if modelo is not None and df_test is not None and forecast is not None:
+    st.subheader('Predicción Multimodelo (RF + Prophet)')
+    X_test = df_test.drop(['date', 'EURUSD'], axis=1)
+    y_test = df_test['EURUSD']
+    y_pred_rf = modelo.predict(X_test)
+    forecast = forecast.set_index('ds')
+    y_pred_prophet = forecast.loc[df_test['date'], 'yhat'].values
+    y_pred_comb = (y_pred_rf + y_pred_prophet) / 2
+    st.line_chart({'Real': y_test, 'Combinado': y_pred_comb})
+    mae_comb = np.mean(np.abs(y_test - y_pred_comb))
+    rmse_comb = np.sqrt(np.mean((y_test - y_pred_comb)**2))
+    st.write(f"MAE Combinado: {mae_comb:.4f} | RMSE Combinado: {rmse_comb:.4f}")
+
+    # Tasa de acierto de dirección
+    aciertos = np.sum(np.sign(y_pred_comb - pd.Series(y_test).shift(1)) == np.sign(y_test - pd.Series(y_test).shift(1)))
+    total = len(y_test)
+    tasa_acierto = aciertos / total * 100
+    st.write(f"Tasa de acierto de dirección (combinado): {tasa_acierto:.1f}%")
+
+    # Descargar tabla Excel de auditoría si existe
+    if os.path.exists('auditoria_predicciones_agosto.xlsx'):
+        with open('auditoria_predicciones_agosto.xlsx', 'rb') as f:
+            st.download_button('Descargar auditoría agosto (Excel)', f, file_name='auditoria_predicciones_agosto.xlsx')
+    else:
+        st.info('No se encontró auditoría_predicciones_agosto.xlsx. Ejecuta la auditoría en el notebook.')
+elif modelo is not None and df_test is not None:
+    st.info('No se encontró forecast.csv para Prophet. El multimodelo requiere ambos modelos.')
+else:
+    st.warning('Faltan archivos de modelo o test. Por favor, entrena el modelo y exporta los datos desde el notebook.')
 
 # 📚 Contexto histórico y fuentes complementarias
 st.markdown("### Antecedentes y análisis complementario")
